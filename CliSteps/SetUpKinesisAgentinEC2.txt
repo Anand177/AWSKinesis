@@ -1,0 +1,33 @@
+Running AWS Kinesis firehose agent from EC2
+
+1. Create a role with Kinesis Admin access for EC2 and attach it to the EC2 machine.
+
+2. Install Kinesis agent in EC2
+sudo yum -y install aws-kinesis-agent
+
+3. Create a source directory for Kinesis agent. 
+sudo mkdir /var/log/source1
+
+4. Open agent.json file in /etc/aws-kinesis to add source& kinesis delivery stream information.
+vi /etc/aws-kinesis/agent.json
+{
+  "cloudwatch.emitMetrics": true,
+  "kinesis.endpoint": "",
+  "firehose.endpoint": "firehose.us-east-2.amazonaws.com",  //Replace us-east-2 with your region
+
+  "flows": [
+    {
+      "filePattern": "/var/log/source1/*.log",   //Mention your source folder
+      "deliveryStream": "MFKDS"					 //Kinesis Firehose stream name	
+    },
+	{
+      "filePattern": "/var/log/source2/*.log",	// Can add multiple streams if needed
+      "deliveryStream": "MFKDS"
+    }
+  ]
+}
+
+5. Start Kinesis agent
+sudo service aws-kinesis-agent start
+
+6. Kinesis agent can be monitored in cd /var/log/aws-kinesis-agent/
