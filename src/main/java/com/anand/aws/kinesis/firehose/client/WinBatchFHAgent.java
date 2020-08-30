@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.anand.aws.kinesis.client;
+package com.anand.aws.kinesis.firehose.client;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -15,6 +15,7 @@ import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehoseClient;
 import com.amazonaws.services.kinesisfirehose.model.PutRecordBatchRequest;
 import com.amazonaws.services.kinesisfirehose.model.PutRecordBatchResult;
 import com.amazonaws.services.kinesisfirehose.model.Record;
+import com.anand.aws.kinesis.twitter.TwitterReader;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -22,7 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author anand
  *
  */
-public class WinKinesisBatchClient {
+public class WinBatchFHAgent {
 
 	/**
 	 * @param args
@@ -41,25 +42,15 @@ public class WinKinesisBatchClient {
 		PutRecordBatchRequest batchPutReq = new PutRecordBatchRequest();
 		batchPutReq.setDeliveryStreamName("MFKDS");
 		
-		Map<String, String> data = new HashMap<String, String>();
-        data.put("Name", System.getProperty("user.name"));
-        
-        ObjectMapper objectMapper = new ObjectMapper();
-        PutRecordBatchResult batchPutResult;
+		PutRecordBatchResult batchPutResult;
         List<Record> recordList = new ArrayList<Record>();
+        List<String> msgList = getTwitterData();
         
         for(int i=0; i<msgCount; i++) {
         	
-        	data.put("RandomNumber", Double.toString(Math.random()));
-            data.put("Time", Long.toString(System.currentTimeMillis()));
-        
-            try {
-            	recordList.add(new Record().withData(ByteBuffer
-            			.wrap(objectMapper.writeValueAsString(data).getBytes())));
-            } catch(JsonProcessingException e) {
-				e.printStackTrace();
-			}
-			
+        	recordList.add(new Record().withData(ByteBuffer
+        		.wrap(msgList.get(i).getBytes())));
+            
             if(recordList.size() % bufferSize ==0) {
             	batchPutReq.setRecords(recordList);
 	    		batchPutResult = firehoseClient.putRecordBatch(batchPutReq);
@@ -76,6 +67,44 @@ public class WinKinesisBatchClient {
     		recordList.clear();
         }
 
+	}
+	
+	
+	public static List<String> getRandomData() {
+		
+		ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, String> data = new HashMap<String, String>();
+        List<String> msgList = new ArrayList<String>();
+        
+        data.put("Name", System.getProperty("user.name"));
+        
+        for(int i=0; i<msgCount; i++) {
+        	data.put("RandomNumber", Double.toString(Math.random()));
+        	data.put("Time", Long.toString(System.currentTimeMillis()));
+        	try {
+				msgList.add(objectMapper.writeValueAsString(data));
+			} catch (JsonProcessingException e) {
+				e.printStackTrace();
+			}
+        }
+        return msgList;
+        
+	}
+	
+	
+	public static List<String> getTwitterData() {
+		
+        TwitterReader tr = new TwitterReader();
+		List<String> msgList = tr.getTimeLineList(msgCount);
+		
+		while(msgList.size() < msgCount) 
+			msgList.addAll(tr.getTimeLineList(msgCount - msgList.size() + 5));
+		
+		if(msgList.size() > msgCount)
+			msgCount = msgList.size();
+			
+        return msgList;
+        
 	}
 
 }

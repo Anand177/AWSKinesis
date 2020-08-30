@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.anand.aws.kinesis.client;
+package com.anand.aws.kinesis.firehose.client;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author anand
  *
  */
-public class UnixKinesisAgent {
+public class UnixFHAgent {
 
 	/**
 	 * @param args

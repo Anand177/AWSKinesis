@@ -1,7 +1,7 @@
 /**
  * 
  */
-package com.anand.aws.kinesis.client;
+package com.anand.aws.kinesis.firehose.client;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author anand
  *
  */
-public class WinKinesisSimpleClient {
+public class WinSimpleFHAgent {
 
 	/**
 	 * @param args
