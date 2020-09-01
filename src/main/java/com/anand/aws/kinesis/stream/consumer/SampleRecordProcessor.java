@@ -88,9 +88,11 @@ public class SampleRecordProcessor implements ShardRecordProcessor {
         try {
             log.info("Reached shard end checkpointing.");
             shardEndedInput.checkpointer().checkpoint();
-        } catch (InvalidStateException | ShutdownException e) {
+        } catch (InvalidStateException  e) {
             log.error("Exception while checkpointing at shard end. Giving up.", e);
-        } finally {
+        } catch(ShutdownException e){
+        	log.error("Exception while checkpointing at shard end. Giving up.", e);
+        }finally {
             MDC.remove(SHARD_ID_MDC_KEY);
         }
 		
@@ -103,9 +105,11 @@ public class SampleRecordProcessor implements ShardRecordProcessor {
         try {
             log.info("Scheduler is shutting down, checkpointing.");
             shutdownRequestedInput.checkpointer().checkpoint();
-        } catch (ShutdownException | InvalidStateException e) {
+        } catch (ShutdownException e) {
             log.error("Exception while checkpointing at requested shutdown. Giving up.", e);
-        } finally {
+        } catch (InvalidStateException e) {
+        	log.error("Exception while checkpointing at requested shutdown. Giving up.", e);
+        }finally {
             MDC.remove(SHARD_ID_MDC_KEY);
         }
 		

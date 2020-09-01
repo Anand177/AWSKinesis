@@ -9,7 +9,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.amazonaws.regions.Regions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
 import com.amazonaws.services.kinesis.model.PutRecordsRequest;
@@ -18,6 +20,8 @@ import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.anand.aws.kinesis.twitter.TwitterReader;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import software.amazon.awssdk.regions.Region;
 
 /**
  * @author anand
@@ -29,26 +33,56 @@ public class WinDSProducer {
 	 * @param args
 	 */
 	
-	static int msgCount = 20;
+	private static final Logger log = LoggerFactory.getLogger(WinDSProducer.class);
+	
+	int msgCount = 20;
+	String streamName;
+	String region;
+	private ObjectMapper objectMapper = new ObjectMapper();
+	
+	private AmazonKinesis kinesisClient;
+	private PutRecordsRequest putRecordsRequest;
+	private List <PutRecordsRequestEntry> putRecordsRequestEntryList;
+	private PutRecordsRequestEntry putRecordsRequestEntry;
+	private PutRecordsResult putRecordsResult;
 	
 	public static void main(String[] args) {
+		
+		String streamName = "MFKDS";
+		Region region = Region.US_EAST_2;
+		
+		WinDSProducer kinesisProducer = new WinDSProducer(streamName, region.id());
+		kinesisProducer.produceData();
 
-		AmazonKinesis kinesisClient = AmazonKinesisClientBuilder.standard()
-			.withRegion(Regions.US_EAST_2).build();
+	}
+	
+	
+	public WinDSProducer(String streamName, String region){
 		
-		PutRecordsRequest putRecordsRequest  = new PutRecordsRequest();
-		putRecordsRequest.setStreamName("MFKDS");
+		log.info("Stream name -> " + streamName);
+		log.info("Region used -> " + region);
 		
-		ObjectMapper objectMapper = new ObjectMapper();
-		List <PutRecordsRequestEntry> putRecordsRequestEntryList  = 
-			new ArrayList<PutRecordsRequestEntry>(); 
-		PutRecordsRequestEntry putRecordsRequestEntry;
-		List<String> msgList = getTwitterData();
+		this.streamName = streamName;
+		this.region = region;
+		
+		log.info("Initializing AWS Objects");
+		kinesisClient = AmazonKinesisClientBuilder.standard().withRegion(region).build();
+		putRecordsRequest  = new PutRecordsRequest();
+		putRecordsRequestEntryList  = new ArrayList<PutRecordsRequestEntry>();
+		
+		putRecordsRequest.setStreamName(streamName);
+		
+	}
+	
+	
+	public void produceData() {
+		
+		List<String> msgList = getRandomData();
 		
 		for(int i =0; i<msgCount; i++) {
 			
 			putRecordsRequestEntry = new PutRecordsRequestEntry();
-			putRecordsRequestEntry.setPartitionKey("PK-" +  i);
+			putRecordsRequestEntry.setPartitionKey("PK-" +  i%2);
 			try {
 				putRecordsRequestEntry.setData(ByteBuffer.wrap(objectMapper
 					.writeValueAsString(msgList.get(i)).getBytes()));
@@ -58,18 +92,20 @@ public class WinDSProducer {
 			putRecordsRequestEntryList.add(putRecordsRequestEntry);
 			
 		}
-		putRecordsRequest.setRecords(putRecordsRequestEntryList);
-		PutRecordsResult putRecordsResult  = kinesisClient.putRecords(putRecordsRequest);
 		
-		System.out.println(putRecordsResult);
+		log.info(msgCount + " messages generated for transmission. Pushing to Kinesis...");
+		
+		putRecordsRequest.setRecords(putRecordsRequestEntryList);
+		putRecordsResult  = kinesisClient.putRecords(putRecordsRequest);
+		
+		log.info("Messages pushed to Kinesis successfully");
+		log.info("Result -> " + putRecordsResult);
 
 	}
-
 	
-	public static List<String> getRandomData() {
+	public List<String> getRandomData() {
 		
-		ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> data = new HashMap<String, String>();
+		Map<String, String> data = new HashMap<String, String>();
         List<String> msgList = new ArrayList<String>();
         
         data.put("Name", System.getProperty("user.name"));
@@ -80,7 +116,7 @@ public class WinDSProducer {
         	try {
 				msgList.add(objectMapper.writeValueAsString(data));
 			} catch (JsonProcessingException e) {
-				e.printStackTrace();
+				log.error("Exception Ganerating Random Data", e);
 			}
         }
         return msgList;
@@ -88,7 +124,7 @@ public class WinDSProducer {
 	}
 	
 	
-	public static List<String> getTwitterData() {
+	public List<String> getTwitterData() {
 		
         TwitterReader tr = new TwitterReader();
 		List<String> msgList = tr.getTimeLineList(msgCount);

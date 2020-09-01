@@ -9,7 +9,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.amazonaws.regions.Regions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehose;
 import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehoseClient;
 import com.amazonaws.services.kinesisfirehose.model.PutRecordBatchRequest;
@@ -18,6 +20,8 @@ import com.amazonaws.services.kinesisfirehose.model.Record;
 import com.anand.aws.kinesis.twitter.TwitterReader;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import software.amazon.awssdk.regions.Region;
 
 /**
  * @author anand
@@ -29,21 +33,39 @@ public class WinBatchFHAgent {
 	 * @param args
 	 */
 	
-	static int msgCount = 100;
-	static int bufferSize = 50;
+	private static final Logger log = LoggerFactory.getLogger(WinBatchFHAgent.class);
+	
+	int msgCount = 200;
+	int bufferSize = 100;
+	private ObjectMapper objectMapper = new ObjectMapper();
+	
+	private AmazonKinesisFirehose firehoseClient;
+	private PutRecordBatchRequest batchPutReq;
+	private PutRecordBatchResult batchPutResult;
 	
 	public static void main(String[] args) {
 
-		//Create Firehose Client
-		AmazonKinesisFirehose firehoseClient = AmazonKinesisFirehoseClient.builder()
-		        .withRegion(Regions.US_EAST_2).build();
-
-		//Configure Put Record
-		PutRecordBatchRequest batchPutReq = new PutRecordBatchRequest();
+		WinBatchFHAgent fhAgent = new WinBatchFHAgent("MFKDS", Region.US_EAST_2.id());
+		fhAgent.produceData();
+		
+	}
+	
+	public WinBatchFHAgent(String streamName, String region){
+		
+		log.info("Stream name -> " + streamName);
+		log.info("Region used -> " + region);
+		
+		log.info("Creating AWS Objects");
+		firehoseClient = AmazonKinesisFirehoseClient.builder().withRegion(region).build();
+		batchPutReq = new PutRecordBatchRequest();
 		batchPutReq.setDeliveryStreamName("MFKDS");
 		
-		PutRecordBatchResult batchPutResult;
-        List<Record> recordList = new ArrayList<Record>();
+	}
+
+	
+	public void produceData() {
+
+		List<Record> recordList = new ArrayList<Record>();
         List<String> msgList = getTwitterData();
         
         for(int i=0; i<msgCount; i++) {
@@ -52,28 +74,32 @@ public class WinBatchFHAgent {
         		.wrap(msgList.get(i).getBytes())));
             
             if(recordList.size() % bufferSize ==0) {
+            	
+            	log.info("Transmitting " + recordList.size() + " Records");
             	batchPutReq.setRecords(recordList);
 	    		batchPutResult = firehoseClient.putRecordBatch(batchPutReq);
 	    		
-	    		System.out.println(batchPutResult.toString());
+	    		log.info("Records transmitted successfully");
+	    		log.info("Result -> " + batchPutResult.toString());
 	    		recordList.clear();
 	        }
 		}
         if(recordList.size() >0) {
+        	
+        	log.info("Transmitting " + recordList.size() + " Records");
         	batchPutReq.setRecords(recordList);
     		batchPutResult = firehoseClient.putRecordBatch(batchPutReq);
     		
-    		System.out.println(batchPutResult.toString());
+    		log.info("Records transmitted successfully");
+    		log.info("Result -> " + batchPutResult.toString());
     		recordList.clear();
         }
-
 	}
 	
 	
-	public static List<String> getRandomData() {
+	public List<String> getRandomData() {
 		
-		ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> data = new HashMap<String, String>();
+		Map<String, String> data = new HashMap<String, String>();
         List<String> msgList = new ArrayList<String>();
         
         data.put("Name", System.getProperty("user.name"));
@@ -84,7 +110,7 @@ public class WinBatchFHAgent {
         	try {
 				msgList.add(objectMapper.writeValueAsString(data));
 			} catch (JsonProcessingException e) {
-				e.printStackTrace();
+				log.error("Exception Ganerating Random Data", e);
 			}
         }
         return msgList;
@@ -92,7 +118,7 @@ public class WinBatchFHAgent {
 	}
 	
 	
-	public static List<String> getTwitterData() {
+	public List<String> getTwitterData() {
 		
         TwitterReader tr = new TwitterReader();
 		List<String> msgList = tr.getTimeLineList(msgCount);
@@ -106,5 +132,6 @@ public class WinBatchFHAgent {
         return msgList;
         
 	}
+
 
 }
